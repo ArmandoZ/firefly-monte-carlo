@@ -3,3 +3,14 @@
 venv/
 .Rhistory
 *.csv
+*.fdb_latexmk
+*.fls
+*.nav
+*.pdf
+*.snm
+*.aux
+*.bbl
+*.blg
+*.log
+*.out
+*.toc
