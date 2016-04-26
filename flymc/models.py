@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.random as npr
+import pylru
 from abc import ABCMeta
 from abc import abstractmethod
 
@@ -9,6 +10,28 @@ def log_logistic(x):
     # Overflow-avoiding version of the log logistic function.
     abs_x = np.abs(x)
     return 0.5 * (x - abs_x) - np.log(1+np.exp(-abs_x))
+
+# class CacheWithIdxs(object):
+#     """TODO: make this bounded size (LRU removal)"""
+#     def __init__(self, N, N_theta):
+#         from collections import defaultdict
+#         self.cache = defaultdict(dict)
+
+#     def retrieve(self, th, idxs):
+#         """
+#         Returns `result` containing `None`s for cache misses.
+#         """
+#         result = [None for _ in range(idxs.shape[0])]
+#         for (i,idx) in enumerate(idxs):
+#             if idx in self.cache[str(th)]:
+#                 result[i] = self.cache[str(th)][idx]
+#         print len(filter(lambda x: x != None, result))
+#         return result
+
+#     def store(self, th, idxs, new_values):
+#         for (idx,val) in zip(idxs, new_values):
+#             self.cache[str(th)][idx] = val
+
 
 class CacheWithIdxs(object):
     def __init__(self, N, N_theta):
@@ -62,7 +85,7 @@ class SimpleCache(object):
         # th object changes it will be messed up
         for i, th_cache in enumerate(self.thetas):
             if th_cache is not None and th is th_cache:
-                assert(np.all(th == th_cache)), "Value of th changed" 
+                assert(np.all(th == th_cache)), "Value of th changed"
                 self.oldest = (i + 1) % len(self.thetas)
                 return self.values[i]
 
@@ -81,37 +104,81 @@ class Model(object):
 
     def __init__(self, cache_size=2):
         # To make things cache-friendly, should always evaluate the old value first
-        self.pseudo_lik_cache = CacheWithIdxs(self.N, cache_size)
+        #self.pseudo_lik_cache = CacheWithIdxs(self.N, cache_size)
         self.p_marg_cache = SimpleCache(cache_size)
         self.num_lik_evals = 0
         self.num_D_lik_evals = 0
 
+        self.cache = pylru.lrucache(1000000)
+
+
+
+    def log_pseudo_lik(self, th, idxs, increment_ctr=False):
+        "Gets vector of pseudo-likelihoods for data indexed by `idxs` and paramters `th`"
+        th_str = str(th)
+        idxs_miss = [idx for idx in idxs if (th_str, idx) not in self.cache]
+        if increment_ctr:
+            print "th " + str(th)
+            print "log_pseudo_lik on " + str(idxs)
+        gap_miss = self._LBgap(th, idxs_miss)
+        result_miss = gap_miss + np.log(1-np.exp(-gap_miss)) # this way avoids overflow
+        if increment_ctr:
+            self.num_lik_evals += len(idxs_miss)
+
+        for idx, res in zip(idxs, result_miss):
+            self.cache[(th_str, idx)] = res
+
+        result = []
+        miss_ptr = 0
+        for idx in idxs:
+            if miss_ptr < len(idxs_miss) and idx == idxs_miss[miss_ptr]:
+                result.append(result_miss[miss_ptr])
+                miss_ptr += 1
+            else:
+                result.append(self.cache[(th_str, idx)])
+        return np.array(result)
+
+
     def log_p_joint(self, th, z):
         # joint distribution over th and z
         return self._logPrior(th) + self._logBProduct(th) \
-                  + np.sum(self.log_pseudo_lik(th, z.bright))
+                  + np.sum(self.log_pseudo_lik(th, z.bright, increment_ctr=True))
 
     def D_log_p_joint(self, th, z):
         # Derivative wrt theta of the joint distribution
         return self._D_logPrior(th) + self._D_logBProduct(th) \
                   + np.sum(self._D_log_pseudo_lik(th, z.bright), axis=0)
 
-    def log_pseudo_lik(self, th, idxs):
-        # Pseduo-likelihood: ratio of bright to dark 
-        # proabilities of indices idxs at th
-        # Check for cached value:
-        cached_value = self.pseudo_lik_cache.retrieve(th, idxs)
-        if cached_value is not None:
-            # this is only to test the cache. Comment out for real use
-            # assert np.all(cached_value == self._LBgap(th,idxs) + np.log(1-np.exp(-self._LBgap(th,idxs))) )
-            return cached_value
+    # def log_pseudo_lik(self, th, idxs, increment_ctr=True):
+    #     # Pseduo-likelihood: ratio of bright to dark
+    #     # proabilities of indices idxs at th
+    #     # Check for cached value:
+    #     cached_value = self.pseudo_lik_cache.retrieve(th, idxs)
 
-        # Otherwise compute it:
-        gap = self._LBgap(th,idxs)
-        result = gap + np.log(1-np.exp(-gap)) # this way avoids overflow
-        self.pseudo_lik_cache.store(th, idxs, result)
-        self.num_lik_evals += len(idxs)
-        return result
+    #     if cached_value is not None:
+    #         # this is only to test the cache. Comment out for real use
+    #         # assert np.all(cached_value == self._LBgap(th,idxs) + np.log(1-np.exp(-self._LBgap(th,idxs))) )
+    #         print "Cache hit!"
+    #         return cached_value
+
+    #     # Otherwise compute it:
+    #     gap = self._LBgap(th,idxs)
+    #     result = gap + np.log(1-np.exp(-gap)) # this way avoids overflow
+    #     self.pseudo_lik_cache.store(th, idxs, result)
+    #     if increment_ctr:
+    #         print "Incrementing ctr"
+    #         self.num_lik_evals += len(idxs)
+    #     return result
+
+    #     # TODO: replace Nones in cached_value
+    #     #gap = self._LBgap(th, idxs)
+    #     #result = gap + np.log(1-np.exp(-gap)) # this way avoids overflow
+    #     #self.pseudo_lik_cache.store(th, idxs, result)
+    #     #for (i,v) in enumerate(cached_value):
+    #     #    if v is None and increment_ctr:
+    #     #        self.num_lik_evals += 1
+    #     #return result
+
 
     def _D_log_pseudo_lik(self, th, idxs):
         # Derivative of pseudo-likelihood wrt theta
@@ -119,14 +186,14 @@ class Model(object):
         D_LBgap = self._D_LBgap(th, idxs)
         self.num_D_lik_evals += len(idxs)
         return D_LBgap/(1-np.exp(-gap)).reshape((len(idxs),) + (1,)*th.ndim)
-    
+
     def log_p_marg(self, th, z=None):
         # marginal posterior prob. Takes z as an optional agrument but doesn't use it
         cached_value = self.p_marg_cache.retrieve(th)
         if cached_value != None:
             # this is only to test the cache. Comment out for real use
             # assert cached_value == self._logPrior(th) + np.sum(self._logL(th, range(self.N)))
-            return cached_value                        
+            return cached_value
 
         result = self._logPrior(th) + np.sum(self._logL(th, range(self.N)))
         self.p_marg_cache.store(th, result)
@@ -239,7 +306,7 @@ class LogisticModel(Model):
         y = np.dot(self.dat[idxs,:],th[:,None])[:,0]
         L = log_logistic(y)
         a, b, c = self.coeffs
-        B = a[idxs]*y**2 + b[idxs]*y + c[idxs] 
+        B = a[idxs]*y**2 + b[idxs]*y + c[idxs]
         return L - B
 
     def _D_logB(self, th, idxs):
@@ -259,13 +326,13 @@ class LogisticModel(Model):
         y  = np.dot(th, self.dat_sum)
         y2 = np.dot(th[None,:],np.dot(self.dat_prod,th[:,None]))
         return y2 + y # note: we're ignoring a constant here since we don't care about normalization
-  
+
     def _D_logBProduct(self, th):
         return self.dat_sum + 2*np.dot(self.dat_prod,th[:,None])[:,0]
 
     def _logPrior(self, th):
         return -0.5*np.sum((th/self.th0)**2)
- 
+
     def _D_logPrior(self, th):
         return -th/self.th0**2
 
@@ -274,7 +341,7 @@ class LogisticModel(Model):
 
     def _logistic_bound(self, y0):
         # Coefficients of a quadratic lower bound to the log-logistic function
-        # i.e    a*x**2 + b*x + c < log(  exp(x)/(1+exp(x))  ) 
+        # i.e    a*x**2 + b*x + c < log(  exp(x)/(1+exp(x))  )
         # y0 parameterizes a family of lower bounds to the logistic function
         # (the bound is tight at +/- y0)
         pexp = np.exp(y0)
@@ -363,14 +430,14 @@ class MulticlassLogisticModel(Model):
             /np.sum(exp_y, axis=1)[ : ,None,None]  )
             # size is:      (len(idxs), K  , D  )
 
-    def _D_logB(self, th, idxs):        
+    def _D_logB(self, th, idxs):
         th_sumk = np.sum(th, axis=0)
         A_th = 0.25*(-th + th_sumk[None,:]/self.K) # size (K, D)
         return             self.x[idxs,:][ : ,None, :  ]   \
                    * ( self.t_hot[idxs,:][ : , :  ,None]   \
                        +   self.b[idxs,:][ : , :  ,None]   \
          + 2 * self.x[idxs,:].dot(A_th.T)[ : , :  ,None] )
-          # size is:               (len(idxs), K  , D  )                
+          # size is:               (len(idxs), K  , D  )
 
     def _D_LBgap(self, th, idxs):
 
@@ -379,10 +446,10 @@ class MulticlassLogisticModel(Model):
         A_th = 0.25*(-th + th_sumk[None,:]/self.K) # size (K, D)
         return             self.x[idxs,:][ : ,None, :  ]   \
                             *(    - exp_y[ : , :  ,None]  \
-                   /np.sum(exp_y, axis=1)[ : ,None,None]  
+                   /np.sum(exp_y, axis=1)[ : ,None,None]
                        -   self.b[idxs,:][ : , :  ,None]   \
          - 2 * self.x[idxs,:].dot(A_th.T)[ : , :  ,None] )
-          # size is:               (len(idxs), K  , D  )                
+          # size is:               (len(idxs), K  , D  )
 
     def _logBProduct(self, th):
         th_sumk = np.sum(th, axis=0)
@@ -398,7 +465,7 @@ class MulticlassLogisticModel(Model):
         return    self.xt_sum                   \
                 + 2 * np.dot(A_th, self.xx_sum) \
                 + self.xb_sum
-        
+
     def _logPrior(self, th):
         return -0.5*np.sum(th**2)/self.th0**2
 
@@ -442,7 +509,7 @@ class RobustRegressionModel(Model):
         self.v     = v     = float(v)
         self.y0    = y0    = float(y0)
         t = t_raw / scale
-        self.logZ = - np.log(scale) # normalization to account for change in scale 
+        self.logZ = - np.log(scale) # normalization to account for change in scale
 
         self.x = x
         self.t = t
@@ -472,7 +539,7 @@ class RobustRegressionModel(Model):
         y_pred = np.dot(self.x[idxs,:],th[:,None])[:,0]
         residuals = self.t[idxs] - y_pred
         return -self.x[idxs, :] \
-            * (- residuals*(v+1)/(v + residuals**2) )[:,None] 
+            * (- residuals*(v+1)/(v + residuals**2) )[:,None]
 
     def _logB(self, th, idxs):
         # lower bound on logistic regression log likelihoods
@@ -481,13 +548,13 @@ class RobustRegressionModel(Model):
         residuals = self.t[idxs] - y_pred
         a, c = self.coeffs
         return a[idxs]*residuals**2 + c[idxs] + self.logZ
-        
+
     def _D_logB(self, th, idxs):
         y_pred = np.dot(self.x[idxs,:],th[:,None])[:,0]
         residuals = self.t[idxs] - y_pred
         a, _ = self.coeffs
         return -self.x[idxs,:]*(2*a[idxs]*residuals)[:,None]
-        
+
     def _LBgap(self, th, idxs):
         # sum of derivative of log likelihoods of data points idxs
         y_pred = np.dot(self.x[idxs,:],th[:,None])[:,0]
@@ -504,7 +571,7 @@ class RobustRegressionModel(Model):
         a, _ = self.coeffs
         return -self.x[idxs, :] \
             * ( - residuals*(v+1)/(v + residuals**2)\
-                - residuals*a[idxs]*2              )[:,None] 
+                - residuals*a[idxs]*2              )[:,None]
 
     def _logBProduct(self, th):
         # log of the product of all the lower bounds
@@ -516,7 +583,7 @@ class RobustRegressionModel(Model):
     def _logPrior(self, th):
         # sparse prior
         return - np.sum(np.abs(th))/self.th0
- 
+
     def _D_logPrior(self, th):
         return -np.sign(th)/self.th0
 
