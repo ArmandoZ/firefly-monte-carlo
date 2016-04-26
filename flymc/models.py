@@ -1,5 +1,6 @@
 import numpy as np
 import numpy.random as npr
+import pylru
 from abc import ABCMeta
 from abc import abstractmethod
 
@@ -10,66 +11,66 @@ def log_logistic(x):
     abs_x = np.abs(x)
     return 0.5 * (x - abs_x) - np.log(1+np.exp(-abs_x))
 
-class CacheWithIdxs(object):
-    """TODO: make this bounded size (LRU removal)"""
-    def __init__(self, N, N_theta):
-        from collections import defaultdict
-        self.cache = defaultdict(dict)
-
-    def retrieve(self, th, idxs):
-        """
-        Returns `result` containing `None`s for cache misses.
-        """
-        result = [None for _ in range(idxs.shape[0])]
-        for (i,idx) in enumerate(idxs):
-            if idx in self.cache[str(th)]:
-                result[i] = self.cache[str(th)][idx]
-        print len(filter(lambda x: x != None, result))
-        return result
-
-    def store(self, th, idxs, new_values):
-        for (idx,val) in zip(idxs, new_values):
-            self.cache[str(th)][idx] = val
-
-
 # class CacheWithIdxs(object):
+#     """TODO: make this bounded size (LRU removal)"""
 #     def __init__(self, N, N_theta):
-#         self.size = N_theta
-#         self.values = np.zeros((N, N_theta))
-#         self.exists = np.zeros((N, N_theta), dtype=bool)
-#         self.lists  = [] # A list of lists containing the cached indices
-#         for i in range(N_theta): self.lists.append([])
-#         self.thetas = [None]*N_theta
-#         self.oldest = 0
+#         from collections import defaultdict
+#         self.cache = defaultdict(dict)
 
 #     def retrieve(self, th, idxs):
-#         # Check whether it's in the cache and give the values if it is
-#         # NOTE: cache tests identity, not equality, so if the value of a
-#         # th object changes it will be messed up
-#         for i, th_cache in enumerate(self.thetas):
-#             if th_cache is not None and np.all(th == th_cache) and np.all(self.exists[idxs, i]):
-#                 self.oldest = (i + 1) % len(self.thetas)
-#                 return self.values[idxs, i]
+#         """
+#         Returns `result` containing `None`s for cache misses.
+#         """
+#         result = [None for _ in range(idxs.shape[0])]
+#         for (i,idx) in enumerate(idxs):
+#             if idx in self.cache[str(th)]:
+#                 result[i] = self.cache[str(th)][idx]
+#         print len(filter(lambda x: x != None, result))
+#         return result
 
 #     def store(self, th, idxs, new_values):
-#         for i, th_cache in enumerate(self.thetas):
-#             if th_cache is not None and th is th_cache:
-#                 assert(np.all(th == th_cache)), "Value of th changed" # This can be turned off for performance
-#                 vacant = np.where(np.logical_not(self.exists[idxs, i]))
-#                 self.values[idxs[vacant], i] = new_values[vacant]
-#                 self.exists[idxs[vacant], i] = 1
-#                 self.lists[i] += list(idxs[vacant])
-#                 return
+#         for (idx,val) in zip(idxs, new_values):
+#             self.cache[str(th)][idx] = val
 
-#         # if we didn't find it, we have a new theta
-#         i = self.oldest
-#         self.oldest = (self.oldest + 1) % len(self.thetas)
-#         self.thetas[i] = th.copy()
-#         self.exists[self.lists[i], i] = 0
-#         self.exists[idxs, i] = 1
-#         self.values[idxs, i] = new_values
-#         del self.lists[i][:]
-#         self.lists[i] += list(idxs)
+
+class CacheWithIdxs(object):
+    def __init__(self, N, N_theta):
+        self.size = N_theta
+        self.values = np.zeros((N, N_theta))
+        self.exists = np.zeros((N, N_theta), dtype=bool)
+        self.lists  = [] # A list of lists containing the cached indices
+        for i in range(N_theta): self.lists.append([])
+        self.thetas = [None]*N_theta
+        self.oldest = 0
+
+    def retrieve(self, th, idxs):
+        # Check whether it's in the cache and give the values if it is
+        # NOTE: cache tests identity, not equality, so if the value of a
+        # th object changes it will be messed up
+        for i, th_cache in enumerate(self.thetas):
+            if th_cache is not None and np.all(th == th_cache) and np.all(self.exists[idxs, i]):
+                self.oldest = (i + 1) % len(self.thetas)
+                return self.values[idxs, i]
+
+    def store(self, th, idxs, new_values):
+        for i, th_cache in enumerate(self.thetas):
+            if th_cache is not None and th is th_cache:
+                assert(np.all(th == th_cache)), "Value of th changed" # This can be turned off for performance
+                vacant = np.where(np.logical_not(self.exists[idxs, i]))
+                self.values[idxs[vacant], i] = new_values[vacant]
+                self.exists[idxs[vacant], i] = 1
+                self.lists[i] += list(idxs[vacant])
+                return
+
+        # if we didn't find it, we have a new theta
+        i = self.oldest
+        self.oldest = (self.oldest + 1) % len(self.thetas)
+        self.thetas[i] = th.copy()
+        self.exists[self.lists[i], i] = 0
+        self.exists[idxs, i] = 1
+        self.values[idxs, i] = new_values
+        del self.lists[i][:]
+        self.lists[i] += list(idxs)
 
 class SimpleCache(object):
     def __init__(self, N_theta):
@@ -103,10 +104,40 @@ class Model(object):
 
     def __init__(self, cache_size=2):
         # To make things cache-friendly, should always evaluate the old value first
-        self.pseudo_lik_cache = CacheWithIdxs(self.N, cache_size)
+        #self.pseudo_lik_cache = CacheWithIdxs(self.N, cache_size)
         self.p_marg_cache = SimpleCache(cache_size)
         self.num_lik_evals = 0
         self.num_D_lik_evals = 0
+
+        self.cache = pylru.lrucache(1000000)
+
+
+
+    def log_pseudo_lik(self, th, idxs, increment_ctr=False):
+        "Gets vector of pseudo-likelihoods for data indexed by `idxs` and paramters `th`"
+        th_str = str(th)
+        idxs_miss = [idx for idx in idxs if (th_str, idx) not in self.cache]
+        if increment_ctr:
+            print "th " + str(th)
+            print "log_pseudo_lik on " + str(idxs)
+        gap_miss = self._LBgap(th, idxs_miss)
+        result_miss = gap_miss + np.log(1-np.exp(-gap_miss)) # this way avoids overflow
+        if increment_ctr:
+            self.num_lik_evals += len(idxs_miss)
+
+        for idx, res in zip(idxs, result_miss):
+            self.cache[(th_str, idx)] = res
+
+        result = []
+        miss_ptr = 0
+        for idx in idxs:
+            if miss_ptr < len(idxs_miss) and idx == idxs_miss[miss_ptr]:
+                result.append(result_miss[miss_ptr])
+                miss_ptr += 1
+            else:
+                result.append(self.cache[(th_str, idx)])
+        return np.array(result)
+
 
     def log_p_joint(self, th, z):
         # joint distribution over th and z
@@ -118,34 +149,35 @@ class Model(object):
         return self._D_logPrior(th) + self._D_logBProduct(th) \
                   + np.sum(self._D_log_pseudo_lik(th, z.bright), axis=0)
 
-    def log_pseudo_lik(self, th, idxs, increment_ctr=True):
-        # Pseduo-likelihood: ratio of bright to dark
-        # proabilities of indices idxs at th
-        # Check for cached value:
-        cached_value = self.pseudo_lik_cache.retrieve(th, idxs)
+    # def log_pseudo_lik(self, th, idxs, increment_ctr=True):
+    #     # Pseduo-likelihood: ratio of bright to dark
+    #     # proabilities of indices idxs at th
+    #     # Check for cached value:
+    #     cached_value = self.pseudo_lik_cache.retrieve(th, idxs)
 
-        # if cached_value is not None:
-        #     # this is only to test the cache. Comment out for real use
-        #     # assert np.all(cached_value == self._LBgap(th,idxs) + np.log(1-np.exp(-self._LBgap(th,idxs))) )
-        #     return cached_value
+    #     if cached_value is not None:
+    #         # this is only to test the cache. Comment out for real use
+    #         # assert np.all(cached_value == self._LBgap(th,idxs) + np.log(1-np.exp(-self._LBgap(th,idxs))) )
+    #         print "Cache hit!"
+    #         return cached_value
 
-        # Otherwise compute it:
-        # gap = self._LBgap(th,idxs)
-        # result = gap + np.log(1-np.exp(-gap)) # this way avoids overflow
-        # self.pseudo_lik_cache.store(th, idxs, result)
-        # if increment_ctr:
-        #     print "Incrementing ctr"
-        #     self.num_lik_evals += len(idxs)
-        # return result
+    #     # Otherwise compute it:
+    #     gap = self._LBgap(th,idxs)
+    #     result = gap + np.log(1-np.exp(-gap)) # this way avoids overflow
+    #     self.pseudo_lik_cache.store(th, idxs, result)
+    #     if increment_ctr:
+    #         print "Incrementing ctr"
+    #         self.num_lik_evals += len(idxs)
+    #     return result
 
-        # TODO: replace Nones in cached_value
-        gap = self._LBgap(th, idxs)
-        result = gap + np.log(1-np.exp(-gap)) # this way avoids overflow
-        self.pseudo_lik_cache.store(th, idxs, result)
-        for (i,v) in enumerate(cached_value):
-            if v is None and increment_ctr:
-                self.num_lik_evals += 1
-        return result
+    #     # TODO: replace Nones in cached_value
+    #     #gap = self._LBgap(th, idxs)
+    #     #result = gap + np.log(1-np.exp(-gap)) # this way avoids overflow
+    #     #self.pseudo_lik_cache.store(th, idxs, result)
+    #     #for (i,v) in enumerate(cached_value):
+    #     #    if v is None and increment_ctr:
+    #     #        self.num_lik_evals += 1
+    #     #return result
 
 
     def _D_log_pseudo_lik(self, th, idxs):
