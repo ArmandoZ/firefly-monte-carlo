@@ -193,7 +193,7 @@ class LogisticModel(Model):
     def _D_logL(self, th, idxs):
         # sum of derivative of log likelihoods of data points idxs
         y = np.dot(self.dat[idxs,:],th[:,None])[:,0]
-        return self.dat[idxs,:]*(np.exp(-y)/(1+np.exp(-y)))[:,None]
+        return self.dat[idxs,:]*np.exp(log_logistic(-y))[:,None]
 
     def _logB(self, th, idxs):
         # lower bound on logistic regression log likelihoods

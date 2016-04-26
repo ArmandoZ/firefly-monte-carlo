@@ -106,8 +106,8 @@ def main():
     #print run_model(model_mcmc)
 
     print "Running untuned FlyMC"
-    model_flymc = ff.LogisticModel(x, t, th0=th0, y0=y0)
-    print run_model(model_flymc, q=0.1, fly=True) # q = prob(dim -> bright)
+    #model_flymc = ff.LogisticModel(x, t, th0=th0, y0=y0)
+    #print run_model(model_flymc, q=0.1, fly=True) # q = prob(dim -> bright)
 
     print "Running MAP-tuned FlyMC"
     _model = ff.LogisticModel(x, t, th0=th0)
@@ -115,7 +115,7 @@ def main():
             fun=lambda th: -1.0*_model.log_p_marg(th),
             x0=np.random.randn(D)*th0,
             jac=lambda th: -1.0*_model.D_log_p_marg(th),
-            method='Nelder-Mead',
+            method='BFGS',
             options={
                 'maxiter': 100,
                 'disp': True
