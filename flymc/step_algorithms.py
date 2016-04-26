@@ -4,7 +4,7 @@ from abc import ABCMeta
 from abc import abstractmethod
 
 class Stepper(object):
-    
+
     __metaclass__ = ABCMeta
 
     @abstractmethod
@@ -80,7 +80,7 @@ class ThetaStepSlice(Stepper):
             if new_logprob > curr_logprob:
                 break # we have our sample
             elif x < 0:
-                L = x 
+                L = x
             elif x > 0:
                 R = x
             else:
@@ -105,12 +105,12 @@ class zStepMH(Stepper):
         Nd = proposed_darken.size
 
         # Consider the bright -> dark proposals
-        log_p_accept = np.log(self.q) - self.log_bd_ratio(th, proposed_darken)
+        log_p_accept = np.log(self.q) + self.log_bd_ratio(th, proposed_darken)
         idxs_accepted = proposed_darken[np.log(npr.rand(Nd)) <  log_p_accept]
         z.darken(idxs_accepted)
 
         # Consider the dark -> bright proposals
-        log_p_accept = -np.log(self.q) + self.log_bd_ratio(th, proposed_brighten)
+        log_p_accept = -np.log(self.q) - self.log_bd_ratio(th, proposed_brighten)
         idxs_accepted = proposed_brighten[np.log(npr.rand(Nb)) <  log_p_accept]
         z.brighten(idxs_accepted)
 
