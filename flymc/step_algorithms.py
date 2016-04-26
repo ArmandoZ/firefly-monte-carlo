@@ -4,7 +4,7 @@ from abc import ABCMeta
 from abc import abstractmethod
 
 class Stepper(object):
-    
+
     __metaclass__ = ABCMeta
 
     @abstractmethod
@@ -23,7 +23,7 @@ class ThetaStepMH(Stepper):
     def step(self, th, z):
         th_new = th + npr.standard_normal(th.shape)*self.stepsize
         # Cache friendly order: evaluate old value first
-        if np.log(npr.rand()) < - self.prob(th, z) + self.prob(th_new, z) :
+        if np.log(npr.rand()) < - self.prob(th, z) + self.prob(th_new, z):
             self.num_rejects = 0
             return th_new
         else:
@@ -80,7 +80,7 @@ class ThetaStepSlice(Stepper):
             if new_logprob > curr_logprob:
                 break # we have our sample
             elif x < 0:
-                L = x 
+                L = x
             elif x > 0:
                 R = x
             else:
