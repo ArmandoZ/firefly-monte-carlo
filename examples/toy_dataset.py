@@ -123,7 +123,7 @@ def main():
     model_flymc_map = ff.LogisticModel(x, t, th0=th0, th_map=th_map.x)
     print run_model(
             model_flymc_map,
-            th_init=th_map.x, # TODO: is it okay to initialize at the MAP?
+            #th_init=th_map.x, # TODO: is it okay to initialize at the MAP?
             q=0.01,
             fly=True)
     #print model_flymc_map.num_lik_evals
