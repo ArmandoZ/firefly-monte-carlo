@@ -52,7 +52,7 @@ class Model(object):
     def log_p_joint(self, th, z):
         # joint distribution over th and z
         return self._logPrior(th) + self._logBProduct(th) \
-                  + np.sum(self.log_pseudo_lik(th, z.bright, increment_ctr=True))
+                  + np.sum(self.log_pseudo_lik(th, z.bright))
 
     def D_log_p_joint(self, th, z):
         # Derivative wrt theta of the joint distribution
