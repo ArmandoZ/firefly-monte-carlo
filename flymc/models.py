@@ -21,14 +21,14 @@ class CacheWithIdxs(object):
         Returns `result` containing `None`s for cache misses.
         """
         result = [None for _ in range(idxs.shape[0])]
-        for i in idxs:
-            if i in self.cache[str(th)]:
-                result[i] = self.cache[str(th)][i]
+        for (i,idx) in enumerate(idxs):
+            if idx in self.cache[str(th)]:
+                result[i] = self.cache[str(th)][idx]
         print len(filter(lambda x: x != None, result))
         return result
 
     def store(self, th, idxs, new_values):
-        for (val,idx) in zip(idxs, new_values):
+        for (idx,val) in zip(idxs, new_values):
             self.cache[str(th)][idx] = val
 
 
