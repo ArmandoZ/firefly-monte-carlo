@@ -105,12 +105,12 @@ class zStepMH(Stepper):
         Nd = proposed_darken.size
 
         # Consider the bright -> dark proposals
-        log_p_accept = np.log(self.q) - self.log_bd_ratio(th, proposed_darken)
+        log_p_accept = np.log(self.q) - self.log_bd_ratio(th, proposed_darken, increment_ctr=False)
         idxs_accepted = proposed_darken[np.log(npr.rand(Nd)) <  log_p_accept]
         z.darken(idxs_accepted)
 
         # Consider the dark -> bright proposals
-        log_p_accept = -np.log(self.q) + self.log_bd_ratio(th, proposed_brighten)
+        log_p_accept = -np.log(self.q) + self.log_bd_ratio(th, proposed_brighten, increment_ctr=False)
         idxs_accepted = proposed_brighten[np.log(npr.rand(Nb)) <  log_p_accept]
         z.brighten(idxs_accepted)
 

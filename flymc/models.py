@@ -49,6 +49,16 @@ class Model(object):
         self.num_lik_evals = 0
         self.num_D_lik_evals = 0
 
+    def log_p_joint(self, th, z):
+        # joint distribution over th and z
+        return self._logPrior(th) + self._logBProduct(th) \
+                  + np.sum(self.log_pseudo_lik(th, z.bright, increment_ctr=True))
+
+    def D_log_p_joint(self, th, z):
+        # Derivative wrt theta of the joint distribution
+        return self._D_logPrior(th) + self._D_logBProduct(th) \
+                  + np.sum(self._D_log_pseudo_lik(th, z.bright), axis=0)
+
     def log_pseudo_lik(self, th, idxs):
         th_str = str(th) # convert to string so hashable
 
@@ -69,16 +79,6 @@ class Model(object):
             else:
                 result[i] = self.pseudo_lik_cache[(th_str, idx)]
         return result
-
-    def log_p_joint(self, th, z):
-        # joint distribution over th and z
-        return self._logPrior(th) + self._logBProduct(th) \
-                  + np.sum(self.log_pseudo_lik(th, z.bright))
-
-    def D_log_p_joint(self, th, z):
-        # Derivative wrt theta of the joint distribution
-        return self._D_logPrior(th) + self._D_logBProduct(th) \
-                  + np.sum(self._D_log_pseudo_lik(th, z.bright), axis=0)
 
     def _D_log_pseudo_lik(self, th, idxs):
         # Derivative of pseudo-likelihood wrt theta
