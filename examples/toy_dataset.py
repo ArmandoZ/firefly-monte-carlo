@@ -13,7 +13,7 @@ sys.path.append('..')
 import flymc as ff
 
 # Set hyperparameters
-stepsize = 0.05          # size of Metropolis-Hastings step in theta
+stepsize = 0.001          # size of Metropolis-Hastings step in theta
 th0 = 0.20               # scale of weights
 
 N_steps = 3000
@@ -53,8 +53,8 @@ def main():
     # Obtain joint distributions over z and th
 
     # Set up step functions
-    def run_model(model, q=0.1, fly=False):
-        th = np.random.randn(D) * th0
+    def run_model(model, th_init=np.random.randn(D)*th0, q=0.1, fly=False):
+        th = th_init
         if fly:
             z = ff.BrightnessVars(N)
         else:
@@ -63,19 +63,27 @@ def main():
         if fly:
             z__stepper = ff.zStepMH(model.log_pseudo_lik, q)
         ths = []
-        for _ in range(N_steps):
+        num_rejects = 0
+        for i in range(N_steps):
             num_lik_prev = model.num_lik_evals
-            if _ % N_ess == 0 and _ > 0:
+            if i % N_ess == 0 and i > 0:
                 #print pypmc.tools.convergence.ess(ths) # TODO: is this correct?
                 #print ess(ths)
-                np.savetxt('trace-untuned-{0}.csv'.format(_), np.array(ths))
+                np.savetxt('trace-untuned-{0}.csv'.format(i), np.array(ths))
                 ths = []
             th = th_stepper.step(th, z)  # Markov transition step for theta
+            num_rejects += th_stepper.num_rejects
             if fly:
                 z  = z__stepper.step(th ,z)  # Markov transition step for z
             ths.append(th)
-            print "Likelihood evals in iter {0}: {1}".format(_, model.num_lik_evals - num_lik_prev)
-            print "Number bright points: {0}".format(len(z.bright))
+            print "\t\t".join(
+                    map(lambda x: "{0:.5f}".format(x), [
+                        i,
+                        len(z.bright),
+                        model.num_lik_evals - num_lik_prev,
+                        1.0 - num_rejects / float(i+1),
+                        -1.0 * model.log_p_marg(th, increment_ctr=False)
+                        ]))
         return th
 
     def ess(th_list):
@@ -93,21 +101,31 @@ def main():
     #     ])
 
 
-    model_mcmc = ff.LogisticModel(x, t, th0=th0, y0=y0)
-    #print model_mcmc.num_lik_evals
+    print "Running MCMC"
+    #model_mcmc = ff.LogisticModel(x, t, th0=th0, y0=y0)
     #print run_model(model_mcmc)
-    #print model_mcmc.num_lik_evals
 
+    print "Running untuned FlyMC"
     model_flymc = ff.LogisticModel(x, t, th0=th0, y0=y0)
-    #print model_flymc.num_lik_evals
     print run_model(model_flymc, q=0.1, fly=True) # q = prob(dim -> bright)
-    #print model_flymc.num_lik_evals
 
-    #_model = ff.LogisticModel(x, t, th0=th0)
-    #th = np.random.randn(D) * th0
-    #th_map = optimize.minimize(lambda x: -1*_model.log_p_marg(x), th)
-    #model_flymc_map = ff.LogisticModel(x, t, th0=th0, th_map=th_map.x)
-    #print run_model(model_flymc_map, q=0.01, fly=True)
+    print "Running MAP-tuned FlyMC"
+    _model = ff.LogisticModel(x, t, th0=th0)
+    th_map = optimize.minimize(
+            fun=lambda th: -1.0*_model.log_p_marg(th),
+            x0=np.random.randn(D)*th0,
+            jac=lambda th: -1.0*_model.D_log_p_marg(th),
+            method='Nelder-Mead',
+            options={
+                'maxiter': 100,
+                'disp': True
+            })
+    model_flymc_map = ff.LogisticModel(x, t, th0=th0, th_map=th_map.x)
+    print run_model(
+            model_flymc_map,
+            th_init=th_map.x, # TODO: is it okay to initialize at the MAP?
+            q=0.01,
+            fly=True)
     #print model_flymc_map.num_lik_evals
 
     # plt.ion()
