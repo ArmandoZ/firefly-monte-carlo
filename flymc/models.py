@@ -87,7 +87,7 @@ class Model(object):
         self.num_D_lik_evals += len(idxs)
         return D_LBgap/(1-np.exp(-gap)).reshape((len(idxs),) + (1,)*th.ndim)
 
-    def log_p_marg(self, th, z=None):
+    def log_p_marg(self, th, z=None, increment_ctr=True):
         # marginal posterior prob. Takes z as an optional agrument but doesn't use it
         cached_value = self.p_marg_cache.retrieve(th)
         if cached_value != None:
@@ -97,7 +97,8 @@ class Model(object):
 
         result = self._logPrior(th) + np.sum(self._logL(th, range(self.N)))
         self.p_marg_cache.store(th, result)
-        self.num_lik_evals += self.N
+        if increment_ctr:
+            self.num_lik_evals += self.N
         return result
 
     def D_log_p_marg(self, th, z=None):
