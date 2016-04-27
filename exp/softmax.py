@@ -74,57 +74,61 @@ def main():
     K = 3
     y0 = 1.5 # \xce in paper
 
-    # model_mcmc = ff.MulticlassLogisticModel(x, t, K, th0=th0, y0=y0)
-    # num_iter_mcmc, th_mcmc, neg_log_post_mcmc = run_model(model_mcmc)
+    model_mcmc = ff.MulticlassLogisticModel(x, t, K, th0=th0, y0=y0)
+    num_iter_mcmc, th_mcmc, neg_log_post_mcmc = run_model(model_mcmc)
+
+    np.savetxt('softmax_num_iter_mcmc-3.csv', np.array(num_iter_mcmc))
+    np.savetxt('softmax_th_mcmc-3.csv', np.array(th_mcmc))
+    np.savetxt('softmax_neg_log_post_mcmc-3.csv', np.array(neg_log_post_mcmc))
+
+    model_flymc = ff.MulticlassLogisticModel(x, t, K, th0=th0, y0=y0)
+    num_iter_flymc, th_flymc, neg_log_post_flymc = run_model(model_flymc, q=0.1, fly=True) # q = prob(dim -> bright)
+
+    np.savetxt('softmax_num_iter_flymc-3.csv', np.array(num_iter_flymc))
+    np.savetxt('softmax_th_flymc-3.csv', np.array(th_flymc))
+    np.savetxt('softmax_neg_log_post_flymc-3.csv', np.array(neg_log_post_flymc))
+
+    # _model = ff.MulticlassLogisticModel(x, t, K, th0=th0)    # dummy model used to optimize th
+    # th = np.random.randn(K, D) * th0
+    # def obj_fun(th):
+    #     # TODO: th -> th_mat
+    #     th_mat = np.reshape(th, [K, D])
+    #     return -1.0*_model.log_p_marg(th_mat)
+    # def grad_fun(th):
+    #     # TODO: th -> th_mat
+    #     th_mat = np.reshape(th, [K, D])
+    #     grad_mat = -1.0*_model.D_log_p_marg(th_mat)
+    #     # TODO: convert to vector
+    #     grad = np.reshape(grad_mat, [K*D,])
+    #     return grad
     #
-    # model_flymc = ff.MulticlassLogisticModel(x, t, K, th0=th0, y0=y0)
-    # num_iter_flymc, th_flymc, neg_log_post_flymc = run_model(model_flymc, q=0.1, fly=True) # q = prob(dim -> bright)
-
-    _model = ff.MulticlassLogisticModel(x, t, K, th0=th0)    # dummy model used to optimize th
-    th = np.random.randn(K, D) * th0
-    def obj_fun(th):
-        # TODO: th -> th_mat
-        th_mat = np.reshape(th, [K, D])
-        return -1.0*_model.log_p_marg(th_mat)
-    def grad_fun(th):
-        # TODO: th -> th_mat
-        th_mat = np.reshape(th, [K, D])
-        grad_mat = -1.0*_model.D_log_p_marg(th_mat)
-        # TODO: convert to vector
-        grad = np.reshape(grad_mat, [K*D,])
-        return grad
-
-    th_map = optimize.minimize(
-            # fun=lambda th: -1.0*_model.log_p_marg(th),
-            fun=obj_fun,
-            x0=np.random.randn(K * D) * th0,
-            # jac=lambda th: -1.0*_model.D_log_p_marg(th),
-            jac=grad_fun,
-            method='BFGS',
-            options={
-                'maxiter': 100,
-                'disp': True
-            })
+    # th_map = optimize.minimize(
+    #         # fun=lambda th: -1.0*_model.log_p_marg(th),
+    #         fun=obj_fun,
+    #         x0=np.random.randn(K * D) * th0,
+    #         # jac=lambda th: -1.0*_model.D_log_p_marg(th),
+    #         jac=grad_fun,
+    #         method='BFGS',
+    #         options={
+    #             'maxiter': 100,
+    #             'disp': True
+    #         })
     #
     # TODO: th_map.x is a vector after optimize.minimize, need to convert
     # to matrix for MulticlassLogisticModel
-    th_map = np.reshape(th_map.x, [K, D])
+    # th_map = np.reshape(th_map.x, [K, D])
     # np.save('softmax_th_map.npy', th_map)
-    # th_map = np.load('softmax_th_map.npy')
 
+    th_map = np.load('softmax_th_map.npy')
     model_flymc_map = ff.MulticlassLogisticModel(x, t, K, th0=th0, th_map=th_map)
     num_iter_flymc_map, th_flymc_map, neg_log_post_flymc_map = run_model(model_flymc_map, q=0.01, fly=True)
 
-    # output traces to .csv
-    # np.savetxt('softmax_num_iter_mcmc.csv', np.array(num_iter_mcmc))
-    # np.savetxt('softmax_th_mcmc.csv', np.array(th_mcmc))
-    # np.savetxt('softmax_neg_log_post_mcmc.csv', np.array(neg_log_post_mcmc))
-    # np.savetxt('softmax_num_iter_flymc.csv', np.array(num_iter_flymc))
-    # np.savetxt('softmax_th_flymc.csv', np.array(th_flymc))
-    # np.savetxt('softmax_neg_log_post_flymc.csv', np.array(neg_log_post_flymc))
-    np.savetxt('softmax_num_iter_flymc_map.csv', np.array(num_iter_flymc_map))
-    np.savetxt('softmax_th_flymc_map.csv', np.array(th_flymc_map))
-    np.savetxt('softmax_neg_log_post_flymc_map.csv', np.array(neg_log_post_flymc_map))
+    # output traces to -3.csv
+
+
+    np.savetxt('softmax_num_iter_flymc_map-3.csv', np.array(num_iter_flymc_map))
+    np.savetxt('softmax_th_flymc_map-3.csv', np.array(th_flymc_map))
+    np.savetxt('softmax_neg_log_post_flymc_map-3.csv', np.array(neg_log_post_flymc_map))
 
 if __name__ == "__main__":
     main()

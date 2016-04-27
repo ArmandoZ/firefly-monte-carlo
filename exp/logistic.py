@@ -79,9 +79,15 @@ def main():
 
     model_mcmc = ff.LogisticModel(x, t, th0=th0, y0=y0)
     num_iter_mcmc, th_mcmc, neg_log_post_mcmc = run_model(model_mcmc)
+    np.savetxt('logistic_num_iter_mcmc-3.csv', np.array(num_iter_mcmc))
+    np.savetxt('logistic_th_mcmc-3.csv', np.array(th_mcmc))
+    np.savetxt('logistic_neg_log_post_mcmc-3.csv', np.array(neg_log_post_mcmc))
 
     model_flymc = ff.LogisticModel(x, t, th0=th0, y0=y0)
     num_iter_flymc, th_flymc, neg_log_post_flymc = run_model(model_flymc, q=0.1, fly=True) # q = prob(dim -> bright)
+    np.savetxt('logistic_num_iter_flymc-3.csv', np.array(num_iter_flymc))
+    np.savetxt('logistic_th_flymc-3.csv', np.array(th_flymc))
+    np.savetxt('logistic_neg_log_post_flymc-3.csv', np.array(neg_log_post_flymc))
 
     # _model = ff.LogisticModel(x, t, th0=th0)    # dummy model used to optimize th
     # th = np.random.randn(D) * th0
@@ -92,15 +98,9 @@ def main():
     num_iter_flymc_map, th_flymc_map, neg_log_post_flymc_map = run_model(model_flymc_map, q=0.01, fly=True)
 
     # output traces to .csv
-    np.savetxt('logistic_num_iter_mcmc.csv', np.array(num_iter_mcmc))
-    np.savetxt('logistic_th_mcmc.csv', np.array(th_mcmc))
-    np.savetxt('logistic_neg_log_post_mcmc.csv', np.array(neg_log_post_mcmc))
-    np.savetxt('logistic_num_iter_flymc.csv', np.array(num_iter_flymc))
-    np.savetxt('logistic_th_flymc.csv', np.array(th_flymc))
-    np.savetxt('logistic_neg_log_post_flymc.csv', np.array(neg_log_post_flymc))
-    np.savetxt('logistic_num_iter_flymc_map.csv', np.array(num_iter_flymc_map))
-    np.savetxt('logistic_th_flymc_map.csv', np.array(th_flymc_map))
-    np.savetxt('logistic_neg_log_post_flymc_map.csv', np.array(neg_log_post_flymc_map))
+    np.savetxt('logistic_num_iter_flymc_map-3.csv', np.array(num_iter_flymc_map))
+    np.savetxt('logistic_th_flymc_map-3.csv', np.array(th_flymc_map))
+    np.savetxt('logistic_neg_log_post_flymc_map-3.csv', np.array(neg_log_post_flymc_map))
 
 if __name__ == "__main__":
     main()
