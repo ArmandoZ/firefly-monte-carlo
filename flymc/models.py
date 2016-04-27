@@ -398,7 +398,7 @@ class RobustRegressionModel(Model):
     def __init__(self, x, t_raw, scale=1, v=4, th0=1, y0=0, th_map=None):
         '''
         x      : Data, a (N, D) array
-        t      : Targets, a (N) array of 0s and 1s
+        t      : Targets, a (N) array of floats
         th0    : Scale of the prior on weights
         th_map : Size (D) array, an estimate of MAP, for tuning the bounds
         y0     : Point at which to make bounds tight (if th_map
