@@ -25,6 +25,7 @@
 \documentclass[final]{beamer}
 
 \usepackage[scale=1.24]{beamerposter} % Use the beamerposter package for laying out the poster
+\usepackage{hyperref}
 
 \usetheme{confposter} % Use the confposter theme supplied with this template
 
@@ -107,40 +108,37 @@ Lorem ipsum dolor sit amet, consectetur, nunc tellus pulvinar tortor, commodo el
 %	INTRODUCTION
 %----------------------------------------------------------------------------------------
 
-\begin{block}{Introduction}
+\begin{block}{Background}
 
-The Bayesian approach to probabalistic modeling is appealing it: allows us to
-separate modeling assumptions from inference procedures; helps us avoid
-overfitting and offers a natural way to control for complexity of models.
-However, a full Bayesian approach can often be too computationally
-challenging. There are fewer areas where this is more pertient than with
-Markov Chain Monte Carlo (MCMC) methods, which cannot be practically applied
-to large datasets because of the prohobitive cost of updating posteriors when
-sampling. For example, when performing Metropolis–Hastings (MH), it is
-necessary to evaluate the target posterior density for each proposed
-parameter update, and this posterior will usually contain a factor for each
-datumThis would then open up MCMC methods to larger datasets than previously
-considered feasible.
+A central quantity of interest when performing inference is the likelihood of
+iid data $X = \{x_i\}_{i=1}^N$ under some parametric probability model with
+parameters $\theta$:
+\begin{equation}
+  \label{eq:lik}
+  L(\theta) = \prod_{i=1}^N L_n(\theta) = \prod_{i=1}^N P(x_i | \theta)
+\end{equation}
 
-The posterior likelihood terms for a term
-\[
-  p(x_{n}|x_{-n,}\text{\ensuremath{\theta}})
-\]
-all the data points at every iteration when sampling a new point.
+For example, using Metroplis-Hastings MCMC to sample a posterior
+distribution $P(\theta | X)$ requires computing the acceptance probability
+\begin{align}
+  A(\theta \to \theta')
+  &= \min \left\{
+      1,
+      \frac{q(\theta' \to \theta) P(\theta'|X)}{q(\theta \to \theta') P(\theta | X)}
+    \right\}\\
+  &= \min \left\{
+      1,
+      \frac{q(\theta' \to \theta) L(\theta')P(\theta')}{q(\theta \to \theta') L(\theta)P(\theta)}
+    \right\}
+\end{align}
+where the proposal distribution $q(\theta' \to \theta)$ is the transition
+kernel for a reversible Markov chain.
 
-Firefly Monte Carlo seeks to address this problem. It is an auxiliary variable
-MCMC algorithm that only queries the likelihoods of a small subset of the
-data, at each iteration; not the full set. The auxiliary variable $z_{i}$
-can, in a figurative way, be thought of as being like a fire-fly which lights
-up (set to 1) thereby determining which likelihoods from the
-data-set must be recomputed.
+Unfortunately, in modern web-scale datasets $N$ may be on the order of
+petabytes and computing $L(\theta)$ at every iteration of the MC may
+be prohibitively slow.
 
 \end{block}
-
-% \begin{figure}
-% \includegraphics[width=0.8\linewidth]{placeholder.jpg}
-% \caption{Figure caption}
-% \end{figure}
 
 %----------------------------------------------------------------------------------------
 
@@ -158,188 +156,86 @@ data-set must be recomputed.
 %	MATERIALS
 %----------------------------------------------------------------------------------------
 
-\begin{block}[]
+\begin{block}{Theory}
 
-The claim in the paper is that using FLY-MC results in orders of magnitude
-faster speed-ups, up to 10 or even 20 fewer likelihood evaluations were
-needed to converge to the Markov chain's stationary distribution. In this
-presentation we will discuss the FLY-MC framework, our implementations of
-FLY-MC and finally, the experiments from the paper that we replicted.
+% TODO: discuss how FlyMC is ``exact'', augmenting joint does not change marginal
+An auxillary variable method works by introducing auxillary variables $Z$
+to form the joint distribution $P(X,Z|\theta) = P(Z|X,\theta) L(\theta)$,
+then later marginalizing to yield $L(\theta) = \sum_Z P(X,Z|\theta)$.
+In FlyMC, the auxillary \emph{brightness} variables $z_i$ are Bernoulli
+\begin{equation}
+  \label{eq:brightness}
+  P(z_n | x_n, \theta)
+  = \left(
+  \frac{L_n(\theta) - B_n(\theta)}{L_n(\theta)}
+  \right)^{z_n} \left(
+  \frac{B_n(\theta)}{L_n(\theta)}
+  \right)^{1-z_n}
+\end{equation}
+where $0 < B_n(\theta) \leq L_n(\theta)$ is a lower bound on the likelihood.
+This yields
+\begin{align}
+  \label{eq:complete-lik}
+  P(x_n,z_n|\theta) = \begin{cases}
+    L_n(\theta) - B_n(\theta) & z_n = 1\\
+    B_n(\theta) & \text{otherwise}
+  \end{cases}
+\end{align}
+% TODO: interpret z_i as blinking fireflies
+The key observation is that Equation~\ref{eq:complete-lik} \textbf{only
+requires computation of $L_n(\theta)$ for the \emph{bright} points $\{x_n \in
+X : z_n = 1\}$}. Similarly defining the \emph{dim} points $X \setminus
+bright$ allows us to decompose
+\begin{align}
+  \label{eq:complete-lik-all-data}
+  P(X,Z|\theta)
+  &= \prod_{n=1}^N (L_n(\theta) - B_n(\theta))^{z_n} (B_n(\theta))^{1 - z_n} \\
+  &= \prod_{n \in bright} (L_n(\theta) - B_n(\theta)) \prod_{n \in dim} B_n(\theta)
+\end{align}
 
-FLYMC's only requirement is that we can compute a lowerbound on the per-datum
-likelihoods.
+If $B_n(\theta)$ is chosen appropriately (e.g.\ exponential family) then
+$\prod_{n \in dim} B_n(\theta)$ can be computed in constant time, resulting in
+an overall $O(\frac{E[\# bright]}{N})$ speedup.
 
-What makes Firefly Monte Carlo unique, in contrast to other metho is that this
-new MCMC procedure is exact in the sense that it leaves the true full-data
-posterior distribution invariant.FlyMC is a latent variable model which
-introduces a collection of Bernoulli variables – one for each datum – with
-conditional distributions chosen so that they effectively turn on and off
-data points in the posterior, hence the ``firefly'' name. The introduction of
-these latent variables does not alter the marginal distribution of the
-parameters of interest. Our only requirement is that it be possible to
-provide a ``collapsible'' lower bound for each likelihood term. FlyMC can lead
-to dramatic performance improvements in MCMC, as measured in wallclock time.
+%TODO: discuss how to choose B_N, tightness at MAP estimate
+
 \end{block}
 
-
-\begin{block}{The Algorithm: Firefly Monte Carlo}
-
-The Firefly Monte Carlo algorithm tackles the problem of sampling from the
-posterior distribution of a probabilistic model. We will denote the
-parameters of interest as $\theta$ and assume that they have prior
-$p(\theta)$. We assume that $N$ data have been observed $\{x_n\}_{n=1}^N$ and
-that these data are conditionally independent given $\theta$ under a
-likelihood $p(x_n | \theta)$. Our target distribution is therefore
-\[
-   p(\theta|x_{\mathrm{1:N}})
-  \propto p(\theta,x_{\mathrm{1:N}})
-  = p(\theta) \prod_{n=1}^N p(x_n | \theta)
-\]
-
-For notional convenience, we will write the nth likelihood as a function of
-$\theta$ as
-\[
-  L_{n}(\theta)=p(x_{n}|\theta)
-\]
-
-An MCMC sampler makes transitions from a given $\theta$ to a new $\theta'$,
-keeping the posterioror distribuion remains invariant. Conventional
-algorithms , like Metropoli-Hastings, require the evolution of the
-unormalised posterior at full at every iteration. Evaluating all N points
-when N is large is the computational bottleneck. FLyMC seeks to address this
-problem. For each data point, $x_n$, an auxiliary binary variable $z_{n}\in\{0,1\}$
-is added, as well as a function $B_{n}(\theta)$ $0<B_{n}(\theta)\leq L_{n}(\theta)$.
-Each $z_{n}$ has the following Bernoulli distribution
-conditioned on the parameters:
-\[
-  p(z_{n}|x_{n},\theta)
-  = \left[
-      \frac{%
-        L_{n}(\theta)-B_{n}(\theta)}{%
-        L_{n}(\theta)}
-    \right]^{z_{n}}
-    \left[
-      \frac{%
-        B_{n}(\theta)}{%
-        L_{n}(\theta)}
-    \right]^{1-z_{n}}
-\]
-
-We then augment the posterior with the following $N$ variables, for each dstapoint:
-\[
-  p(\theta,z_{\mathrm{1:N}}|x_{\mathrm{1:N}})
-  \propto p(\theta,\{x_{n},z_{n}\}_{\mathrm{n=1:N}})
-\]
-
-
-Augmenting the joint distribution with auxiliary variables does not alter or
-damage the original marginal distribution.
-
-
-The following materials were required to complete the research:
-
-\begin{itemize}
-\item Curabitur pellentesque dignissim
-\item Eu facilisis est tempus quis
-\item Duis porta consequat lorem
-\item Eu facilisis est tempus quis
-\end{itemize}
-
-The materials were prepared according to the steps outlined below:
+\begin{block}{Algorithm}
 
 \begin{enumerate}
-\item Curabitur pellentesque dignissim
-\item Eu facilisis est tempus quis
-\item Duis porta consequat lorem
-\item Curabitur pellentesque dignissim
+  \item Initalize $\theta^{(0)}$.
+  \item Sample $z^{(t)}_n \sim \text{Bernoulli}\left(
+    \frac{L_n(\theta^{(t)}) - B_n(\theta^{(t)})}{L_n(\theta^{(t)})}
+    \right)$
+  \item Propose $\theta^{(t+1)} \sim q(\theta^{(t)} \to \theta^{(t+1)})$.
+  \item Compute acceptance probability $A(\theta^{(t)} \to \theta^{(t+1})$
+    with $z^{(t)}_n$ fixed and accept with probability $A(\theta^{(t)} \to \theta^{(t+1})$
 \end{enumerate}
 
-\end{block}
+Many $z_n = 0$ so it is wasteful to directly sample the brightness variables
+$z$. another MH MCMC to efficiently sample $z_n$ from
+Equation~\ref{eq:brightness}. This yields \emph{implicit sampling} and
+introduces an additional parameter $q_{dim \to bright}$ used as the proposal
+probabilities for the brightness MC.
 
-%----------------------------------------------------------------------------------------
+\end{block}
 
 \end{column} % End of column 2.1
 
 \begin{column}{\onecolwid}\vspace{-.6in} % The second column within column 2 (column 2.2)
 
-%----------------------------------------------------------------------------------------
-%	METHODS
-%----------------------------------------------------------------------------------------
-
-\begin{block}{Methods}
-
-Lorem ipsum dolor \textbf{sit amet}, consectetur adipiscing elit. Sed laoreet accumsan mattis. Integer sapien tellus, auctor ac blandit eget, sollicitudin vitae lorem. Praesent dictum tempor pulvinar. Suspendisse potenti. Sed tincidunt varius ipsum, et porta nulla suscipit et. Etiam congue bibendum felis, ac dictum augue cursus a. \textbf{Donec} magna eros, iaculis sit amet placerat quis, laoreet id est. In ut orci purus, interdum ornare nibh. Pellentesque pulvinar, nibh ac malesuada accumsan, urna nunc convallis tortor, ac vehicula nulla tellus eget nulla. Nullam lectus tortor, \textit{consequat tempor hendrerit} quis, vestibulum in diam. Maecenas sed diam augue.
-
-\end{block}
-
-%----------------------------------------------------------------------------------------
-
-\end{column} % End of column 2.2
-
-\end{columns} % End of the split of column 2 - any content after this will now take up 2 columns width
-
-%----------------------------------------------------------------------------------------
-%	IMPORTANT RESULT
-%----------------------------------------------------------------------------------------
-
-\begin{alertblock}{Important Result}
-
-Lorem ipsum dolor \textbf{sit amet}, consectetur adipiscing elit. Sed commodo molestie porta. Sed ultrices scelerisque sapien ac commodo. Donec ut volutpat elit.
-
-\end{alertblock}
-
-%----------------------------------------------------------------------------------------
-
-\begin{columns}[t,totalwidth=\twocolwid] % Split up the two columns wide column again
-
-\begin{column}{\onecolwid} % The first column within column 2 (column 2.1)
-
-%----------------------------------------------------------------------------------------
-%	MATHEMATICAL SECTION
-%----------------------------------------------------------------------------------------
-
-\begin{block}{Mathematical Section}
-
-Nam quis odio enim, in molestie libero. Vivamus cursus mi at nulla elementum sollicitudin. Nam quis odio enim, in molestie libero. Vivamus cursus mi at nulla elementum sollicitudin.
-
-\begin{equation}
-E = mc^{2}
-\label{eqn:Einstein}
-\end{equation}
-
-Nam quis odio enim, in molestie libero. Vivamus cursus mi at nulla elementum sollicitudin. Nam quis odio enim, in molestie libero. Vivamus cursus mi at nulla elementum sollicitudin.
-
-\begin{equation}
-\cos^3 \theta =\frac{1}{4}\cos\theta+\frac{3}{4}\cos 3\theta
-\label{eq:refname}
-\end{equation}
-
-Nam quis odio enim, in molestie libero. Vivamus cursus mi at nulla elementum sollicitudin. Nam quis odio enim, in molestie libero. Vivamus cursus mi at nulla elementum sollicitudin.
-
-\begin{equation}
-\kappa =\frac{\xi}{E_{\mathrm{max}}} %\mathbb{ZNR}
-\end{equation}
-
-\end{block}
-
-%----------------------------------------------------------------------------------------
-
-\end{column} % End of column 2.1
-
-\begin{column}{\onecolwid} % The second column within column 2 (column 2.2)
-
-%----------------------------------------------------------------------------------------
-%	RESULTS
-%----------------------------------------------------------------------------------------
-
-\begin{block}{Results}
+\begin{block}{Logistic Regression}
 
 \begin{figure}
 \includegraphics[width=0.8\linewidth]{placeholder.jpg}
 \caption{Figure caption}
 \end{figure}
 
-Nunc tempus venenatis facilisis. Curabitur suscipit consequat eros non porttitor. Sed a massa dolor, id ornare enim:
+\end{block}
+
+
+\begin{block}{Softmax Regression}
 
 \begin{table}
 \vspace{2ex}
@@ -357,11 +253,19 @@ Treatment 3 & 0.0009271 & 0.296 \\
 
 \end{block}
 
-%----------------------------------------------------------------------------------------
+\begin{block}{Robust Linear Regression}
+
+\begin{figure}
+\includegraphics[width=0.8\linewidth]{placeholder.jpg}
+\caption{Figure caption}
+\end{figure}
+
+\end{block}
+
 
 \end{column} % End of column 2.2
 
-\end{columns} % End of the split of column 2
+\end{columns} % End of the split of column 2 - any content after this will now take up 2 columns width
 
 \end{column} % End of the second column
 
@@ -375,22 +279,11 @@ Treatment 3 & 0.0009271 & 0.296 \\
 
 \begin{block}{Conclusion}
 
-Nunc tempus venenatis facilisis. \textbf{Curabitur suscipit} consequat eros non porttitor. Sed a massa dolor, id ornare enim. Fusce quis massa dictum tortor \textbf{tincidunt mattis}. Donec quam est, lobortis quis pretium at, laoreet scelerisque lacus. Nam quis odio enim, in molestie libero. Vivamus cursus mi at \textit{nulla elementum sollicitudin}.
-
-\end{block}
-
-%----------------------------------------------------------------------------------------
-%	ADDITIONAL INFORMATION
-%----------------------------------------------------------------------------------------
-
-\begin{block}{Additional Information}
-
-Maecenas ultricies feugiat velit non mattis. Fusce tempus arcu id ligula varius dictum.
-\begin{itemize}
-\item Curabitur pellentesque dignissim
-\item Eu facilisis est tempus quis
-\item Duis porta consequat lorem
-\end{itemize}
+\begin{enumerate}
+  \item Investigation of how to choose $B_n$ such that $\prod_n B_n$ easy
+  \item MAP estimation to optimize $B_n$ doesn't work when $N$ is large
+  \item Implement on software platforms supporting large-scale data
+\end{enumerate}
 
 \end{block}
 
