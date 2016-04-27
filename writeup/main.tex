@@ -25,6 +25,7 @@
 \documentclass[final]{beamer}
 
 \usepackage[scale=1.24]{beamerposter} % Use the beamerposter package for laying out the poster
+\usepackage{subfigure}
 \usepackage{hyperref}
 
 \usetheme{confposter} % Use the confposter theme supplied with this template
@@ -94,12 +95,19 @@
 
 \begin{alertblock}{Objectives}
 
-Lorem ipsum dolor sit amet, consectetur, nunc tellus pulvinar tortor, commodo eleifend risus arcu sed odio:
+FlyMC is concerned with estimating a large data-set's likelihood from smaller subsets.
+After assuming the existence of a lower bound $0 <
+  B_n(\theta) \leq L_n(\theta) = P(x_n | \theta)$ on the likelihood, it:
 \begin{itemize}
-\item Mollis dignissim, magna augue tincidunt dolor, interdum vestibulum urna
-\item Sed aliquet luctus lectus, eget aliquet leo ullamcorper consequat. Vivamus eros sem, iaculis ut euismod non, sollicitudin vel orci.
-\item Nascetur ridiculus mus.
-\item Euismod non erat. Nam ultricies pellentesque nunc, ultrices volutpat nisl ultrices a.
+  \item Presents an auxillary variable method allowing estimation of the full dataset's likelihood
+    using only subsets of the data
+  \item Discusses additional aspects such as \emph{MAP tuning} (tuning
+    the $B_n(\theta)$ bound to be tight at a MAP estimate for $\theta$),
+    \emph{implicit sampling} (running a second MC to indirectly sample the auxillary
+    variables), and strategies for selecting $B_n(\theta)$
+  \item Scales to large data-sets which do not fit on a single machine
+  \item Is general purpose and applicable to a variety of methods, including:
+    logistic regression, softmax classification, and robust linear regression
 \end{itemize}
 
 \end{alertblock}
@@ -118,25 +126,29 @@ parameters $\theta$:
   L(\theta) = \prod_{i=1}^N L_n(\theta) = \prod_{i=1}^N P(x_i | \theta)
 \end{equation}
 
-For example, using Metroplis-Hastings MCMC to sample a posterior
-distribution $P(\theta | X)$ requires computing the acceptance probability
+For example, these likelihoods must be computed  when sampling a posterior
+distibution $P(\theta | X)$ using  Metroplis-Hastings MCMC, where
+we must compute the acceptance probability:
 \begin{align}
-  A(\theta \to \theta')
+  A(\theta'| \theta)
   &= \min \left\{
       1,
-      \frac{q(\theta' \to \theta) P(\theta'|X)}{q(\theta \to \theta') P(\theta | X)}
+      \frac{q(\theta | \theta') P(\theta'|X)}{q(\theta' | \theta) P(\theta | X)}
     \right\}\\
   &= \min \left\{
       1,
-      \frac{q(\theta' \to \theta) L(\theta')P(\theta')}{q(\theta \to \theta') L(\theta)P(\theta)}
+      \frac{q(\theta|\theta') L(\theta')P(\theta')}{q(\theta'|\theta) L(\theta)P(\theta)}
     \right\}
 \end{align}
-where the proposal distribution $q(\theta' \to \theta)$ is the transition
+where the proposal distribution $q(\theta|\theta')$ is the transition
 kernel for a reversible Markov chain.
 
-Unfortunately, in modern web-scale datasets $N$ may be on the order of
-petabytes and computing $L(\theta)$ at every iteration of the MC may
-be prohibitively slow.
+Unfortunately, in the era of 'Big Data' $N$ may be on the order of millions of
+bytes and computing $L(\theta)$ at every iteration of the MC may be
+prohibitively slow. Ultimately, the aim of Firefly Monte Carlo is to speed up
+such MCMC methods, by ensuring that we do not recompute likelihods for all
+data-points at each iteration but instead only over a smaller tractable
+subset. 
 
 \end{block}
 
@@ -162,6 +174,7 @@ be prohibitively slow.
 An auxillary variable method works by introducing auxillary variables $Z$
 to form the joint distribution $P(X,Z|\theta) = P(Z|X,\theta) L(\theta)$,
 then later marginalizing to yield $L(\theta) = \sum_Z P(X,Z|\theta)$.
+
 In FlyMC, the auxillary \emph{brightness} variables $z_i$ are Bernoulli
 \begin{equation}
   \label{eq:brightness}
@@ -172,8 +185,8 @@ In FlyMC, the auxillary \emph{brightness} variables $z_i$ are Bernoulli
   \frac{B_n(\theta)}{L_n(\theta)}
   \right)^{1-z_n}
 \end{equation}
-where $0 < B_n(\theta) \leq L_n(\theta)$ is a lower bound on the likelihood.
-This yields
+where \textbf{the existence of a lower bound $0 < B_n(\theta) \leq L_n(\theta)$ on
+the likelihood is assumed}. The joint distribution then has the form
 \begin{align}
   \label{eq:complete-lik}
   P(x_n,z_n|\theta) = \begin{cases}
@@ -182,7 +195,7 @@ This yields
   \end{cases}
 \end{align}
 % TODO: interpret z_i as blinking fireflies
-The key observation is that Equation~\ref{eq:complete-lik} \textbf{only
+A key observation is that Equation~\ref{eq:complete-lik} \textbf{only
 requires computation of $L_n(\theta)$ for the \emph{bright} points $\{x_n \in
 X : z_n = 1\}$}. Similarly defining the \emph{dim} points $X \setminus
 bright$ allows us to decompose
@@ -193,9 +206,9 @@ bright$ allows us to decompose
   &= \prod_{n \in bright} (L_n(\theta) - B_n(\theta)) \prod_{n \in dim} B_n(\theta)
 \end{align}
 
-If $B_n(\theta)$ is chosen appropriately (e.g.\ exponential family) then
-$\prod_{n \in dim} B_n(\theta)$ can be computed in constant time, resulting in
-an overall $O(\frac{E[\# bright]}{N})$ speedup.
+If $B_n(\theta)$ is chosen (e.g.\ exponential family) such that $\prod_{n \in
+dim} B_n(\theta)$ is $O(1)$, then a $O(\frac{E[\# bright]}{N})$ speedup can
+be attained.
 
 %TODO: discuss how to choose B_N, tightness at MAP estimate
 
@@ -227,33 +240,33 @@ probabilities for the brightness MC.
 
 \begin{block}{Logistic Regression}
 
+We demonstrate FlyMC fitting logistic regression with prior
+$P(\theta) \sim \mathcal{N}(0,I)$ to classify $7$s and $9$s on MNIST.
+Figure~\ref{fig:evals} shows FlyMC requires more than 100 orders of magnitude
+less likelihood evaluations to find similarly probable posterior modes:
+
 \begin{figure}
-\includegraphics[width=0.8\linewidth]{placeholder.jpg}
-\caption{Figure caption}
+  \centering
+  \hspace{1.3cm}\includegraphics[width=0.8\linewidth]{Figures/evals_per_iter.png}
+  \newline
+  \includegraphics[width=0.8\linewidth]{Figures/evals_per_iter.png}
+  \caption{FlyMC explores similar posterior modes while requiring much less likelihood evaluations}
+  \label{fig:evals}
 \end{figure}
 
-\begin{figure}
-\includegraphics[width=0.8\linewidth]{placeholder.jpg}
-\caption{Figure caption}
-\end{figure}
-
-\begin{table}
-\vspace{2ex}
-\begin{tabular}{l l l}
-\toprule
-\textbf{Treatments} & \textbf{Response 1} & \textbf{Response 2}\\
-\midrule
-Treatment 1 & 0.0003262 & 0.562 \\
-Treatment 2 & 0.0015681 & 0.910 \\
-Treatment 3 & 0.0009271 & 0.296 \\
-\bottomrule
-\end{tabular}
-\caption{Table caption}
-\end{table}
+Figure~\ref{fig:traces} shows $\theta$ traces from a represenative run. Note that
+the values of $\theta$ vary less under FlyMAP, suggesting that mixing is slower
+using FlyMAP's estimates over only $bright$ datapoints, which is further
+verified by Figure~\ref{fig:acf}.
 
 \begin{figure}
-\includegraphics[width=0.8\linewidth]{placeholder.jpg}
-\caption{Figure caption}
+  \begin{center}
+    \includegraphics[width=0.5\linewidth]{Figures/trace_mcmc.png}
+    \includegraphics[width=0.5\linewidth]{Figures/trace_flymap.png}
+  \end{center}
+  \caption{Traces of $\theta$ for regular MH-MCMC (\emph{top}) and MAP-tuned
+  FlyMC (\emph{bottom})}
+  \label{fig:traces}
 \end{figure}
 
 \end{block}
@@ -268,16 +281,25 @@ Treatment 3 & 0.0009271 & 0.296 \\
 
 \begin{column}{\onecolwid} % The third column
 
-\begin{block}{Softmax Regression}
-
 \begin{figure}
-\includegraphics[width=0.8\linewidth]{placeholder.jpg}
-\caption{Figure caption}
+  \includegraphics[width=0.8\linewidth]{Figures/acf_logistic.png}
+  \caption{Autocorrelation of logistic regression samples}
+  \label{fig:acf}
 \end{figure}
 
+\begin{block}{Softmax}
+
+To demonstrate applicability to other applications and methods, we
+apply FlyMC to fit a softmax classification model on three CIFAR-10
+classes (airplane, automobile and bird) using Langevin
+dynamics. Figure~\ref{fig:softmax} reports similar findings as
+previously reported.
+
 \begin{figure}
-\includegraphics[width=0.8\linewidth]{placeholder.jpg}
-\caption{Figure caption}
+  \includegraphics[width=0.5\linewidth]{Figures/log_lik_softmax.png}
+  \includegraphics[width=0.5\linewidth]{Figures/nlp_softmax.png}
+  \caption{Softmax classification on CIFAR-10 fitted using Metropolis-adjusted Langevin dynamics}
+  \label{fig:softmax}
 \end{figure}
 
 \end{block}
