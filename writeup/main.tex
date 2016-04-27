@@ -6,7 +6,7 @@
 % Created by:
 % Computational Physics and Biophysics Group, Jacobs University
 % https://teamwork.jacobs-university.de:8443/confluence/display/CoPandBiG/LaTeX+Poster
-% 
+%
 % Further modified by:
 % Nathaniel Johnston (nathaniel@njohnston.ca)
 %
@@ -60,7 +60,7 @@
 \usepackage{booktabs} % Top and bottom rules for tables
 
 %----------------------------------------------------------------------------------------
-%	TITLE SECTION 
+%	TITLE SECTION
 %----------------------------------------------------------------------------------------
 
 \title{Firefly Monte Carlo: Exact MC with data subsets} % Poster title
@@ -97,7 +97,7 @@ Lorem ipsum dolor sit amet, consectetur, nunc tellus pulvinar tortor, commodo el
 \begin{itemize}
 \item Mollis dignissim, magna augue tincidunt dolor, interdum vestibulum urna
 \item Sed aliquet luctus lectus, eget aliquet leo ullamcorper consequat. Vivamus eros sem, iaculis ut euismod non, sollicitudin vel orci.
-\item Nascetur ridiculus mus.  
+\item Nascetur ridiculus mus.
 \item Euismod non erat. Nam ultricies pellentesque nunc, ultrices volutpat nisl ultrices a.
 \end{itemize}
 
@@ -109,16 +109,38 @@ Lorem ipsum dolor sit amet, consectetur, nunc tellus pulvinar tortor, commodo el
 
 \begin{block}{Introduction}
 
-  \input{introduction.tex}
+The Bayesian approach to probabalistic modeling is appealing it: allows us to
+separate modeling assumptions from inference procedures; helps us avoid
+overfitting and offers a natural way to control for complexity of models.
+However, a full Bayesian approach can often be too computationally
+challenging. There are fewer areas where this is more pertient than with
+Markov Chain Monte Carlo (MCMC) methods, which cannot be practically applied
+to large datasets because of the prohobitive cost of updating posteriors when
+sampling. For example, when performing Metropolis–Hastings (MH), it is
+necessary to evaluate the target posterior density for each proposed
+parameter update, and this posterior will usually contain a factor for each
+datumThis would then open up MCMC methods to larger datasets than previously
+considered feasible.
+
+The posterior likelihood terms for a term
+\[
+  p(x_{n}|x_{-n,}\text{\ensuremath{\theta}})
+\]
+all the data points at every iteration when sampling a new point.
+
+Firefly Monte Carlo seeks to address this problem. It is an auxiliary variable
+MCMC algorithm that only queries the likelihoods of a small subset of the
+data, at each iteration; not the full set. The auxiliary variable $z_{i}$
+can, in a figurative way, be thought of as being like a fire-fly which lights
+up (set to 1) thereby determining which likelihoods from the
+data-set must be recomputed.
 
 \end{block}
 
-%------------------------------------------------
-
-\begin{figure}
-\includegraphics[width=0.8\linewidth]{placeholder.jpg}
-\caption{Figure caption}
-\end{figure}
+% \begin{figure}
+% \includegraphics[width=0.8\linewidth]{placeholder.jpg}
+% \caption{Figure caption}
+% \end{figure}
 
 %----------------------------------------------------------------------------------------
 
@@ -136,7 +158,83 @@ Lorem ipsum dolor sit amet, consectetur, nunc tellus pulvinar tortor, commodo el
 %	MATERIALS
 %----------------------------------------------------------------------------------------
 
-\begin{block}{Materials}
+\begin{block}[]
+
+The claim in the paper is that using FLY-MC results in orders of magnitude
+faster speed-ups, up to 10 or even 20 fewer likelihood evaluations were
+needed to converge to the Markov chain's stationary distribution. In this
+presentation we will discuss the FLY-MC framework, our implementations of
+FLY-MC and finally, the experiments from the paper that we replicted.
+
+FLYMC's only requirement is that we can compute a lowerbound on the per-datum
+likelihoods.
+
+What makes Firefly Monte Carlo unique, in contrast to other metho is that this
+new MCMC procedure is exact in the sense that it leaves the true full-data
+posterior distribution invariant.FlyMC is a latent variable model which
+introduces a collection of Bernoulli variables – one for each datum – with
+conditional distributions chosen so that they effectively turn on and off
+data points in the posterior, hence the ``firefly'' name. The introduction of
+these latent variables does not alter the marginal distribution of the
+parameters of interest. Our only requirement is that it be possible to
+provide a ``collapsible'' lower bound for each likelihood term. FlyMC can lead
+to dramatic performance improvements in MCMC, as measured in wallclock time.
+\end{block}
+
+
+\begin{block}{The Algorithm: Firefly Monte Carlo}
+
+The Firefly Monte Carlo algorithm tackles the problem of sampling from the
+posterior distribution of a probabilistic model. We will denote the
+parameters of interest as $\theta$ and assume that they have prior
+$p(\theta)$. We assume that $N$ data have been observed $\{x_n\}_{n=1}^N$ and
+that these data are conditionally independent given $\theta$ under a
+likelihood $p(x_n | \theta)$. Our target distribution is therefore
+\[
+   p(\theta|x_{\mathrm{1:N}})
+  \propto p(\theta,x_{\mathrm{1:N}})
+  = p(\theta) \prod_{n=1}^N p(x_n | \theta)
+\]
+
+For notional convenience, we will write the nth likelihood as a function of
+$\theta$ as
+\[
+  L_{n}(\theta)=p(x_{n}|\theta)
+\]
+
+An MCMC sampler makes transitions from a given $\theta$ to a new $\theta'$,
+keeping the posterioror distribuion remains invariant. Conventional
+algorithms , like Metropoli-Hastings, require the evolution of the
+unormalised posterior at full at every iteration. Evaluating all N points
+when N is large is the computational bottleneck. FLyMC seeks to address this
+problem. For each data point, $x_n$, an auxiliary binary variable $z_{n}\in\{0,1\}$
+is added, as well as a function $B_{n}(\theta)$ $0<B_{n}(\theta)\leq L_{n}(\theta)$.
+Each $z_{n}$ has the following Bernoulli distribution
+conditioned on the parameters:
+\[
+  p(z_{n}|x_{n},\theta)
+  = \left[
+      \frac{%
+        L_{n}(\theta)-B_{n}(\theta)}{%
+        L_{n}(\theta)}
+    \right]^{z_{n}}
+    \left[
+      \frac{%
+        B_{n}(\theta)}{%
+        L_{n}(\theta)}
+    \right]^{1-z_{n}}
+\]
+
+We then augment the posterior with the following $N$ variables, for each dstapoint:
+\[
+  p(\theta,z_{\mathrm{1:N}}|x_{\mathrm{1:N}})
+  \propto p(\theta,\{x_{n},z_{n}\}_{\mathrm{n=1:N}})
+\]
+
+
+Augmenting the joint distribution with auxiliary variables does not alter or
+damage the original marginal distribution.
+
 
 The following materials were required to complete the research:
 
@@ -188,7 +286,7 @@ Lorem ipsum dolor \textbf{sit amet}, consectetur adipiscing elit. Sed laoreet ac
 
 Lorem ipsum dolor \textbf{sit amet}, consectetur adipiscing elit. Sed commodo molestie porta. Sed ultrices scelerisque sapien ac commodo. Donec ut volutpat elit.
 
-\end{alertblock} 
+\end{alertblock}
 
 %----------------------------------------------------------------------------------------
 
@@ -203,7 +301,7 @@ Lorem ipsum dolor \textbf{sit amet}, consectetur adipiscing elit. Sed commodo mo
 \begin{block}{Mathematical Section}
 
 Nam quis odio enim, in molestie libero. Vivamus cursus mi at nulla elementum sollicitudin. Nam quis odio enim, in molestie libero. Vivamus cursus mi at nulla elementum sollicitudin.
-  
+
 \begin{equation}
 E = mc^{2}
 \label{eqn:Einstein}
@@ -287,7 +385,7 @@ Nunc tempus venenatis facilisis. \textbf{Curabitur suscipit} consequat eros non 
 
 \begin{block}{Additional Information}
 
-Maecenas ultricies feugiat velit non mattis. Fusce tempus arcu id ligula varius dictum. 
+Maecenas ultricies feugiat velit non mattis. Fusce tempus arcu id ligula varius dictum.
 \begin{itemize}
 \item Curabitur pellentesque dignissim
 \item Eu facilisis est tempus quis
