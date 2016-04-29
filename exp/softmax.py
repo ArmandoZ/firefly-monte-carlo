@@ -11,11 +11,12 @@ import sys
 sys.path.append('..')
 import flymc as ff
 from sklearn.preprocessing import normalize
+import load_data
 
 # Set hyperparameters
-stepsize = 0.06          # size of Metropolis-Hastings step in theta
+stepsize = 0.03          # size of Metropolis-Hastings step in theta
 th0 = 0.2               # scale of weights
-N_steps = 3000
+N_steps = 1500
 N_ess = 2000
 
 def preprocess():
@@ -25,7 +26,7 @@ def preprocess():
     x = pca.transform(x)
     np.save('softmax_x.npy', x)
     np.save('softmax_t.npy', t)
-    exit(1)
+    # exit(1)
 
 def main():
     def run_model(model, q=0.1, fly=False):
@@ -53,10 +54,11 @@ def main():
             num_rejects_list.append(th_stepper.num_rejects)
             num_iter_list.append(model.num_lik_evals - num_lik_prev)
             neg_log_post_list.append(-1.0 * model.log_p_marg(th, increment_ctr=False))
-            print "Accept rate: {0}".format(1.0 - sum(num_rejects_list)/float(_+1))
-            print "Likelihood evals in iter {0}: {1}".format(_, num_iter_list[-1])
-            print "Neg log posterior: {0}".format(neg_log_post_list[-1])
-            print "Number bright points: {0}".format(len(z.bright))
+            if _ % 100 == 0:
+                print "Accept rate: {0}".format(1.0 - sum(num_rejects_list)/float(_+1))
+                print "Likelihood evals in iter {0}: {1}".format(_, num_iter_list[-1])
+                print "Neg log posterior: {0}".format(neg_log_post_list[-1])
+                print "Number bright points: {0}".format(len(z.bright))
 
         return num_iter_list, th_lists, neg_log_post_list
 
