@@ -40,8 +40,8 @@ def main():
                 z  = z__stepper.step(th ,z)  # Markov transition step for z
             th_lists.append(th)
             num_rejects_list.append(th_stepper.num_rejects)
-            # num_iter_list.append(model.num_lik_evals - num_lik_prev)
-            num_iter_list.append(len(z.bright))
+             num_iter_list.append(model.num_lik_evals - num_lik_prev)
+            #num_iter_list.append(len(z.bright))
             neg_log_post_list.append(-1.0 * model.log_p_marg(th, increment_ctr=False))
             print "Accept rate: {0}".format(1.0 - sum(num_rejects_list)/float(_+1))
             print "Likelihood evals in iter {0}: {1}".format(_, num_iter_list[-1])
