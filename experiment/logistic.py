@@ -138,7 +138,7 @@ def save_results(performance_results):
             model_name = performance_result[KEY_NAME]
             sample_ess = performance_result[KEY_SAMPLE_ESS]
             sample_evals = performance_result[KEY_SAMPLE_EVALS]
-            f.write("{0},{1},{2},{3}\n" % (model_name, sample_ess, sample_evals, sample_ess * sample_evals))
+            f.write("{0},{1},{2},{3}\n".format(model_name, sample_ess, sample_evals, sample_ess * sample_evals))
 
 def main():
     global N
