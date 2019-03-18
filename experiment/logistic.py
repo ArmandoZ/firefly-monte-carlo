@@ -50,6 +50,7 @@ def main():
         th_lists = []           # trace of th
         num_rejects_list = []   #
         num_iter_list = []      # number of num_lik_evals for each iteration
+        neg_log_list = []
         for _ in range(N_steps):
             num_lik_prev = model.num_lik_evals
             if _ % N_ess == 0 and _ > 0:
@@ -61,26 +62,29 @@ def main():
 
 
             if fly:
-                z  = z__stepper.step(th ,z)  # Markov transition step for z
+                z = z__stepper.step(th, z)  # Markov transition step for z
             th_lists.append(th)
             num_rejects_list.append(th_stepper.num_rejects)
             num_iter_list.append(model.num_lik_evals - num_lik_prev)
             print "Accept rate: {0}".format(1.0 - sum(num_rejects_list)/float(_+1))
             print "Likelihood evals in iter {0}: {1}".format(_, model.num_lik_evals - num_lik_prev)
-            print "Neg log posterior: {0}".format(-1.0 * model.log_p_marg(th, increment_ctr=False))
+            neg_log = -1.0 * model.log_p_marg(th, increment_ctr=False)
+            neg_log_list.append(neg_log)
+            # print "Neg log posterior: {0}".format(-1.0 * model.log_p_marg(th, increment_ctr=False))
+            print "Neg log posterior: {0}".format(neg_log)
             print "Number bright points: {0}".format(len(z.bright))
 
-        return th, num_iter_list, th_lists
+        # return th, num_iter_list, th_lists
+        return th, neg_log_list, th_lists
     # preprocess data and save to .npy file
     # so tha we dont have to PCA them each time
     # preprocess()
 
-    x = np.load('logistic_x.npy')
-    t = np.load('logistic_t.npy')
+    x = np.load('../data/logistic_x.npy')
+    t = np.load('../data/logistic_t.npy')
     print x.shape, t.shape
     N, D = x.shape
     y0 = 1.5 # \xce in paper
-
 
     def ess(th_list):
         th = np.array(th_list)

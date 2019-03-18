@@ -1,9 +1,9 @@
+# [WORK IN PROCESS!!]
+
 # Instructions
 `virtualenv -p python2.7 venv`
 `source ./venv/bin/activate`
 `pip -r requirements.txt`
-
-[WORK IN PROCESS]
 
 # Changes in this fork
 * Implements (BFGS optimization) MAP tuning of likelihood lower bound
