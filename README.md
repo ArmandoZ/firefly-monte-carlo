@@ -3,6 +3,8 @@
 `source ./venv/bin/activate`
 `pip -r requirements.txt`
 
+[WORK IN PROCESS]
+
 # Changes in this fork
 * Implements (BFGS optimization) MAP tuning of likelihood lower bound
 * Fixed MH acceptance probability for brightness variables
