@@ -41,13 +41,17 @@ class Model(object):
 
     __metaclass__ = ABCMeta
 
-    def __init__(self, cache_size=1000000):
+    def __init__(self, cache_size=1000000, name=None):
         # TODO: cache_size should default to 2N where N is numbe of data poins
         # To make things cache-friendly, should always evaluate the old value first
         self.pseudo_lik_cache = pylru.lrucache(cache_size)
         self.p_marg_cache = SimpleCache(cache_size)
         self.num_lik_evals = 0
         self.num_D_lik_evals = 0
+
+        if name is None:
+            name = "Model"
+        self.name = name
 
     def log_p_joint(self, th, z):
         # joint distribution over th and z
@@ -155,7 +159,7 @@ class Model(object):
         pass
 
 class LogisticModel(Model):
-    def __init__(self, x, t, th0=1, y0=1.5, th_map=None):
+    def __init__(self, x, t, th0=1, y0=1.5, th_map=None, name=None):
         '''
         x      : Data, a (N, D) array
         t      : Targets, a (N) array of 0s and 1s
@@ -165,7 +169,9 @@ class LogisticModel(Model):
                  not given)
         '''
         self.N, self.D = x.shape
-        Model.__init__(self)
+        if name is None:
+            name = "LogisticModel"
+        Model.__init__(self, name=name)
 
         self.dat = x*(2*t[:,None]-1)
         if th_map is None:          # create the same bound for all data points
