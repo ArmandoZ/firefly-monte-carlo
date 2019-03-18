@@ -82,9 +82,8 @@ def run_model(model, q=0.1, fly=False, verbose=False):
             print "Neg log posterior: {0}".format(neg_log)
             print "Number bright points: {0}".format(len(z.bright))
 
-    sample_ess = ess(sample_th_list)
     sample_evals = sum(sample_num_lik_evals_list)
-    np.savetxt('trace-{0}-{1}.csv'.format(model.name, sample_ess), np.array(sample_th_list))
+    np.savetxt('trace-{0}-{1}.csv'.format(model.name, N_ess), np.array(sample_th_list))
 
     performance_dict[KEY_NAME] = model.name
     performance_dict[KEY_NUM_REJECTS] = num_rejects_list
@@ -92,7 +91,6 @@ def run_model(model, q=0.1, fly=False, verbose=False):
     performance_dict[KEY_ACCEPTANCE] = acceptance_list
     performance_dict[KEY_NEG_LOG] = neg_log_list
     performance_dict[KEY_SAMPLE_EVALS] = sample_evals
-    performance_dict[KEY_SAMPLE_ESS] = sample_ess
 
     return performance_dict
 
@@ -132,13 +130,12 @@ def save_results(performance_results):
     plt.savefig("./result/%s.png" % "Mean Likelihood Evaluations")
 
     ## Sample
-    with open("./result/sample_result.csv", 'w') as f:
-        f.write("model_name,ESS,mean_likelihood_evaluation,product\n")
+    with open("./result/sample_result_{0}.csv".format(N_ess), 'w') as f:
+        f.write("model_name,mean_likelihood_evaluation,ESS,\n")
         for performance_result in performance_results:
             model_name = performance_result[KEY_NAME]
-            sample_ess = performance_result[KEY_SAMPLE_ESS]
             sample_evals = performance_result[KEY_SAMPLE_EVALS]
-            f.write("{0},{1},{2},{3}\n".format(model_name, sample_ess, sample_evals, sample_ess * sample_evals))
+            f.write("{0},{1}\n".format(model_name, sample_evals))
 
 def main():
     global N

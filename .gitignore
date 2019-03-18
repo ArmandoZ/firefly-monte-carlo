@@ -2,6 +2,7 @@
 .Rproj.user
 venv/
 .Rhistory
+.RData
 *.csv
 *.fdb_latexmk
 *.fls
