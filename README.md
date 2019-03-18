@@ -1,11 +1,13 @@
 # Instructions
-`virtualenv -p python2.7 venv`
-`source ./venv/bin/activate`
-`pip -r requirements.txt`
-`cd experiment`
-`python logistic.py`
-`cd ..`
-`R --no-save < ess.R`
+```bash
+virtualenv -p python2.7 venv
+source ./venv/bin/activate
+pip -r requirements.txt
+cd experiment
+python logistic.py
+cd ..
+R --no-save < ess.R
+```
 
 See outputs in `experiment/result`.
 
