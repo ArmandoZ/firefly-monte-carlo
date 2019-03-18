@@ -1,9 +1,9 @@
 cycler==0.10.0
-matplotlib==1.5.1
-numpy==1.11.0
+matplotlib==2.0.0
+numpy==1.11.1
 pylru==1.0.9
 pyparsing==2.1.1
-pypmc==1.0
+pypmc==1.1.1
 python-dateutil==2.5.3
 python-mnist==0.3
 pytz==2016.4
