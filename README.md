@@ -11,6 +11,14 @@ R --no-save < ess.R
 
 See outputs in `experiment/result`.
 
+# Example Outputs
+
+![Mean Likelikood Evaluation Compared](https://github.com/ArmandoZ/firefly-monte-carlo/blob/master/experiment/result_example/Mean%20Likelihood%20Evaluations.png?raw=true)
+
+![Negative Log Posterior Compared](https://github.com/ArmandoZ/firefly-monte-carlo/blob/master/experiment/result_example/Negative%20Log%20Posteriors.png?raw=true)
+
+
+
 
 # Changes in this fork
 * Only remained logistic regression experiment
