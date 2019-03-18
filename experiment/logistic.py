@@ -10,6 +10,9 @@ sys.path.append('..')
 import flymc as ff
 import data
 
+# Reproducibility
+np.random.seed(0)
+
 # Set hyperparameters
 stepsize = 0.02          # size of Metropolis-Hastings step in theta
 th0 = 1.5               # scale of weights
