@@ -14,3 +14,5 @@ venv/
 *.log
 *.out
 *.toc
+experiment/result/
+writeup/main.synctex.gz
