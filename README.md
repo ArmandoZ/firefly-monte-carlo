@@ -1,8 +1,9 @@
 # Instructions
+<<<<<<< HEAD
 ```bash
 virtualenv -p python2.7 venv
 source ./venv/bin/activate
-pip -r requirements.txt
+pip install -r requirements.txt
 cd experiment
 python logistic.py
 cd ..
