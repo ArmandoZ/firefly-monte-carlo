@@ -3,7 +3,6 @@ import numpy.random as npr
 from scipy import optimize
 import matplotlib as mpl
 import matplotlib.pyplot as plt
-import pypmc
 import csv
 import sys
 import os
@@ -93,16 +92,6 @@ def run_model(model, q=0.1, fly=False, verbose=False):
     performance_dict[KEY_SAMPLE_EVALS] = sample_evals
 
     return performance_dict
-
-def ess(th_list):
-    # Alternate: pypmc.tools.convergence.ess(th_list) # TODO: is this correct?
-    th = np.array(th_list)
-    th_mean = np.mean(th, axis=0)
-
-    def autocorr(x, t):
-        return np.mean((x[0:len(x)-t,:] - th_mean) * (x[t:len(x),:] - th_mean))
-
-    return 1.0 * th.shape[0] / (1.0 + 2.0 * sum(map(lambda t: autocorr(th,t), range(1,th.shape[0]))))
 
 def save_results(performance_results):
     ## Plot
