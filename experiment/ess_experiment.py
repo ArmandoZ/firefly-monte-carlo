@@ -52,3 +52,27 @@ def main():
 
 if __name__ == "__main__":
     main()
+    
+# trace-regular mcmc--557.028807796.csv
+# (2000, 51)
+# ess_pypmc 0.0198
+# ess_multi 0.2435
+# ess       -557.0288
+
+# trace-tuned_flymc-7035.9984602.csv
+# (2000, 51)
+# ess_pypmc 0.0192
+# ess_multi 0.0000
+# ess       7035.9985
+
+# trace-untuned_flymc--5939.88475791.csv
+# (2000, 51)
+# ess_pypmc 0.0197
+# ess_multi 0.0000
+# ess       -5939.8848
+
+# daily-minimum-temperatures-in-me.csv
+# (3650, 1)
+# ess_pypmc 0.8829
+# ess_multi 115.3692
+# ess       1.9470

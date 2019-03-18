@@ -51,8 +51,8 @@ def run_model(model, q=0.1, fly=False, verbose=False):
     sample_num_lik_evals_list = []
     sample_th_list = []
 
-    # Run chain
-    for _ in range(N_steps + N_ess):
+    # Burn in
+    for _ in range(N_steps):
         num_lik_prev = model.num_lik_evals
         # Markov transition
         th = th_stepper.step(th, z)  # Markov transition step for theta
@@ -65,15 +65,10 @@ def run_model(model, q=0.1, fly=False, verbose=False):
         acceptance = 1.0 - sum(num_rejects_list)/float(_+1)
         neg_log = -1.0 * model.log_p_marg(th, increment_ctr=False)
 
-        if _ < N_steps:
-            num_rejects_list.append(num_rejects)
-            num_lik_evals_list.append(num_lik_evals)
-            acceptance_list.append(acceptance)
-            neg_log_list.append(neg_log)
-        else: 
-            # _ >= N_steps
-            sample_num_lik_evals_list.append(num_lik_evals)
-            sample_th_list.append(th)
+        num_rejects_list.append(num_rejects)
+        num_lik_evals_list.append(num_lik_evals)
+        acceptance_list.append(acceptance)
+        neg_log_list.append(neg_log)
  
         # Print info
         if verbose or (_ % 50 == 0):
@@ -82,9 +77,26 @@ def run_model(model, q=0.1, fly=False, verbose=False):
             print "Neg log posterior: {0}".format(neg_log)
             print "Number bright points: {0}".format(len(z.bright))
 
-    sample_ess = ess(sample_th_list)
-    sample_evals = sum(sample_num_lik_evals_list)
-    np.savetxt('trace-{0}-{1}.csv'.format(model.name, sample_ess), np.array(sample_th_list))
+    _ = 0
+    # while True:
+        # dest = N_ess
+        # if dest == 0:
+        #     break
+        # else:
+        #     N_ess = dest
+    while _ < N_ess:
+        # Markov transition
+        th = th_stepper.step(th, z)  # Markov transition step for theta
+        if fly:
+            z = z_stepper.step(th, z)  # Markov transition step for z
+
+        sample_th_list.append(th)
+        # Print info
+        if verbose or (_ % 50 == 0):
+            print "Iter {0}".format(_)
+        
+        _ += 1
+    np.savetxt('trace-{0}-{1}.csv'.format(model.name, N_ess), np.array(sample_th_list))
 
     performance_dict[KEY_NAME] = model.name
     performance_dict[KEY_NUM_REJECTS] = num_rejects_list
@@ -151,30 +163,30 @@ def main():
 
     performance_results = []
 
-    model_mcmc = ff.LogisticModel(x, t, th0=th0, y0=y0, name="regular mcmc")
-    mcmc_performance = run_model(model_mcmc)
-    performance_results.append(mcmc_performance)
+    # model_mcmc = ff.LogisticModel(x, t, th0=th0, y0=y0, name="regular mcmc")
+    # mcmc_performance = run_model(model_mcmc)
+    # performance_results.append(mcmc_performance)
 
     model_untuned_flymc = ff.LogisticModel(x, t, th0=th0, y0=y0, name="untuned_flymc")
     untuned_flymc_performance = run_model(model_untuned_flymc, q=0.1, fly=True) # q = prob(dim -> bright)
     performance_results.append(untuned_flymc_performance)
 
-    tmp_model = ff.LogisticModel(x, t, th0=th0)
-    th_map = optimize.minimize(
-            fun=lambda th: -1.0*tmp_model.log_p_marg(th),
-            x0=np.random.randn(D)*th0,
-            jac=lambda th: -1.0*tmp_model.D_log_p_marg(th),
-            method='BFGS',
-            options={
-                'maxiter': 100,
-                'disp': True
-            })
+    # tmp_model = ff.LogisticModel(x, t, th0=th0)
+    # th_map = optimize.minimize(
+    #         fun=lambda th: -1.0*tmp_model.log_p_marg(th),
+    #         x0=np.random.randn(D)*th0,
+    #         jac=lambda th: -1.0*tmp_model.D_log_p_marg(th),
+    #         method='BFGS',
+    #         options={
+    #             'maxiter': 100,
+    #             'disp': True
+    #         })
 
-    model_tuned_flymc = ff.LogisticModel(x, t, th0=th0, th_map=th_map.x, name="tuned_flymc")
-    tuned_flymc_performance = run_model(model_tuned_flymc, q=0.01, fly=True)
-    performance_results.append(tuned_flymc_performance)
+    # model_tuned_flymc = ff.LogisticModel(x, t, th0=th0, th_map=th_map.x, name="tuned_flymc")
+    # tuned_flymc_performance = run_model(model_tuned_flymc, q=0.01, fly=True)
+    # performance_results.append(tuned_flymc_performance)
 
-    save_results(performance_results)
+    # save_results(performance_results)
 
 if __name__ == "__main__":
     main()
